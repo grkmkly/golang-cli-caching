@@ -1,13 +1,19 @@
 package cmd
 
 import (
+	"context"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/spf13/cobra"
 	"main.go/api"
+	"main.go/utils"
 )
 
 var port string = "3000"
@@ -17,7 +23,10 @@ var urlPort = make(map[string]string)
 var caching = &cobra.Command{
 	Use: "caching-proxy",
 	Run: func(cmd *cobra.Command, args []string) {
+
 		r := mux.NewRouter()
+
+		// Flagleri aldım
 		port, err := cmd.Flags().GetString("port")
 		if err != nil {
 			log.Fatal(err)
@@ -26,28 +35,74 @@ var caching = &cobra.Command{
 		if err != nil {
 			log.Fatal(err)
 		}
-		//  mapte tutuyoruz olan port ve linki
-		urlPort[url] = port
+
+		// sonra olan dosyayı okuyup urlport mapine yazdım
+		utils.Readfile(urlPort)
+
+		// mapte kontrol edip olup olmadığını öğrendim
+		isHave := utils.ControlMap(url, port, urlPort)
+
+		if isHave {
+			fmt.Print("mevcut")
+			return
+		}
+
+		//alınan dosyayı ilk başta yazdım
+		utils.Writefile(url, port)
 		var srv = &http.Server{
-			Addr:    port,
+			Addr:    "localhost:" + port,
 			Handler: r,
 		}
-		//json dosyası geldi
-		jsonFile := getRequest(url)
-		api.Router(r, jsonFile)
 
-		if err := srv.ListenAndServe(); err != nil {
+		if err != nil {
 			log.Fatal(err)
 		}
 
-		// ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
-		// defer cancel()
-		// srv.Shutdown(ctx)
+		jsonChan := make(chan []byte)
+
+		go getRequest(jsonChan, url) // İstek yaratıp  o urlye istek attım
+		jsonFile := <-jsonChan       // json dosyasını alana kadar bekleyerek json dosyasını alıyor
+
+		api.Router(r, jsonFile) // json dosyasını yazmaya hazırlanıyor
+
+		go serviceandListen(srv, port) // portu açıyor
+		fmt.Print("Serverdan geldi")
+		go getSignal(srv)
+		time.Sleep(5 * time.Minute) // 5 dakika bekliyoruz localin kapanması için
+		// bu komut bütünü de serveri kapatıyor
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(ctx); err != nil {
+			log.Fatalf("HTTP shutdown error: %v", err)
+		}
+
 	},
 }
 
+func serviceandListen(srv *http.Server, port string) {
+	fmt.Printf("Server is running in %v port", port)
+	if err := srv.ListenAndServe(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func getSignal(srv *http.Server) {
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt)
+
+	// Waiting for SIGINT (kill -2)
+	<-stop
+
+	utils.Deletefile()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatalf("HTTP shutdown error: %v", err)
+	}
+}
+
 // Request gönderiyor ve responsu okuyup gönderiyor
-func getRequest(url string) []byte {
+func getRequest(jsonChan chan []byte, url string) {
 	req, err := http.NewRequest(http.MethodGet, url, nil) // request oluşturuyor fakat requesti göndermiyor hemen
 	if err != nil {
 		log.Fatal(err)
@@ -60,7 +115,8 @@ func getRequest(url string) []byte {
 	if err != nil {
 		log.Fatal(err)
 	}
-	return jsonFile
+	fmt.Print("İSTEK GELDİ")
+	jsonChan <- jsonFile
 }
 
 func init() {
