@@ -43,14 +43,18 @@ var caching = &cobra.Command{
 		isHave := utils.ControlMap(url, port, urlPort)
 
 		if isHave {
-			fmt.Print("mevcut")
+			var localurl string = fmt.Sprintf("http://127.0.0.1:" + urlPort[url] + "/products")
+			locJsonChan := make(chan []byte)
+			go getRequest(locJsonChan, localurl)
+			//jsonFile := <-locJsonChan
+			fmt.Println("Localden geldi")
 			return
 		}
 
 		//alınan dosyayı ilk başta yazdım
 		utils.Writefile(url, port)
 		var srv = &http.Server{
-			Addr:    "localhost:" + port,
+			Addr:    "127.0.0.1:" + port,
 			Handler: r,
 		}
 
@@ -66,10 +70,11 @@ var caching = &cobra.Command{
 		api.Router(r, jsonFile) // json dosyasını yazmaya hazırlanıyor
 
 		go serviceandListen(srv, port) // portu açıyor
-		fmt.Print("Serverdan geldi")
+		fmt.Println("Serverdan geldi")
 		go getSignal(srv)
-		time.Sleep(5 * time.Minute) // 5 dakika bekliyoruz localin kapanması için
+		time.Sleep(20 * time.Second) // 5 dakika bekliyoruz localin kapanması için
 		// bu komut bütünü de serveri kapatıyor
+		utils.Deletefile()
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := srv.Shutdown(ctx); err != nil {
@@ -115,7 +120,7 @@ func getRequest(jsonChan chan []byte, url string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Print("İSTEK GELDİ")
+	fmt.Println("istek geldi")
 	jsonChan <- jsonFile
 }
 
