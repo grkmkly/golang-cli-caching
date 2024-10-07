@@ -3,6 +3,7 @@ package utils
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -23,7 +24,7 @@ func controlFile() bool {
 	return true
 }
 
-func Readfile(urlport map[string]string) error {
+func Readfile(urlport map[string]string, json chan bool) error {
 	if isErr := controlFile(); !isErr {
 		return errors.New("Exit")
 	}
@@ -38,7 +39,9 @@ func Readfile(urlport map[string]string) error {
 		if err != nil {
 			return err
 		}
-		if string(line) == "" {
+		fmt.Print(string(line))
+		if line == nil {
+			fmt.Print("selamlar")
 			break
 		}
 		lineArray := strings.Split(string(line), "|")

@@ -13,6 +13,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/spf13/cobra"
 	"main.go/api"
+	"main.go/handlers"
+	"main.go/model"
 	"main.go/utils"
 )
 
@@ -26,6 +28,17 @@ var caching = &cobra.Command{
 
 		r := mux.NewRouter()
 
+		var db = model.Database{
+			Username: "grkmkly35",
+			Server:   "",
+		}
+
+		err := handlers.Connect(&db)
+		if err != nil {
+			log.Fatal(err)
+		}
+		handlers.SetCollection(&db, "linkport")
+
 		// Flagleri aldım
 		port, err := cmd.Flags().GetString("port")
 		if err != nil {
@@ -35,32 +48,29 @@ var caching = &cobra.Command{
 		if err != nil {
 			log.Fatal(err)
 		}
-
-		// sonra olan dosyayı okuyup urlport mapine yazdım
-		utils.Readfile(urlPort)
-
-		// mapte kontrol edip olup olmadığını öğrendim
-		isHave := utils.ControlMap(url, port, urlPort)
-
-		if isHave {
-			var localurl string = fmt.Sprintf("http://127.0.0.1:" + urlPort[url] + "/products")
-			locJsonChan := make(chan []byte)
-			go getRequest(locJsonChan, localurl)
-			//jsonFile := <-locJsonChan
-			fmt.Println("Localden geldi")
-			return
+		item := model.LinkPort{
+			Link: url,
+			Port: port,
 		}
+		fmt.Print(db)
 
-		//alınan dosyayı ilk başta yazdım
-		utils.Writefile(url, port)
+		// if isHave {
+		// 	var localurl string = fmt.Sprintf("http://127.0.0.1:" + urlPort[url] + "/products")
+		// 	locJsonChan := make(chan []byte)
+		// 	// cache istek gönderdim
+		// 	go getRequest(locJsonChan, localurl)
+		// 	<-locJsonChan
+		// 	fmt.Println("Localden geldi")
+		// 	return
+		// }
+		//alınan portu ve linki txt dosyasına yazdım
+		//utils.Writefile(url, port)
+
 		var srv = &http.Server{
 			Addr:    "127.0.0.1:" + port,
 			Handler: r,
 		}
-
-		if err != nil {
-			log.Fatal(err)
-		}
+		handlers.InsertLinkPort(&db, &item)
 
 		jsonChan := make(chan []byte)
 
@@ -70,9 +80,11 @@ var caching = &cobra.Command{
 		api.Router(r, jsonFile) // json dosyasını yazmaya hazırlanıyor
 
 		go serviceandListen(srv, port) // portu açıyor
-		fmt.Println("Serverdan geldi")
+		fmt.Println("Server açıldı")
+
 		go getSignal(srv)
-		time.Sleep(20 * time.Second) // 5 dakika bekliyoruz localin kapanması için
+
+		time.Sleep(2 * time.Minute) // 2 dakika bekliyoruz localin kapanması için
 		// bu komut bütünü de serveri kapatıyor
 		utils.Deletefile()
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -80,7 +92,6 @@ var caching = &cobra.Command{
 		if err := srv.Shutdown(ctx); err != nil {
 			log.Fatalf("HTTP shutdown error: %v", err)
 		}
-
 	},
 }
 
