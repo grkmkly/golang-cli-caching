@@ -7,8 +7,8 @@ import (
 )
 
 type LinkPort struct {
-	Id        primitive.ObjectID `json:"_id"`
+	Id        primitive.ObjectID `bson:"_id"`
 	Link      string             `bson:"link"`
 	Port      string             `bson:"port"`
-	CreatedAt time.Time          `bson:"createdAt"`
+	CreatedAt time.Time          `bson:"createdat"`
 }

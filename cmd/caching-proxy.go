@@ -15,12 +15,10 @@ import (
 	"main.go/api"
 	"main.go/handlers"
 	"main.go/model"
-	"main.go/utils"
 )
 
 var port string = "3000"
 var url string = "http://dummyjson.com/products"
-var urlPort = make(map[string]string)
 
 var caching = &cobra.Command{
 	Use: "caching-proxy",
@@ -52,26 +50,26 @@ var caching = &cobra.Command{
 			Link: url,
 			Port: port,
 		}
-		fmt.Print(db)
+		isHave, portWarning := handlers.CheckLinkPort(&db, item)
 
-		// if isHave {
-		// 	var localurl string = fmt.Sprintf("http://127.0.0.1:" + urlPort[url] + "/products")
-		// 	locJsonChan := make(chan []byte)
-		// 	// cache istek gönderdim
-		// 	go getRequest(locJsonChan, localurl)
-		// 	<-locJsonChan
-		// 	fmt.Println("Localden geldi")
-		// 	return
-		// }
-		//alınan portu ve linki txt dosyasına yazdım
-		//utils.Writefile(url, port)
-
+		if isHave && portWarning == item.Port {
+			var localurl string = fmt.Sprintf("http://127.0.0.1:" + item.Port + "/products")
+			locJsonChan := make(chan []byte)
+			// cache istek gönderdim
+			go getRequest(locJsonChan, localurl)
+			<-locJsonChan
+			fmt.Println("Localden geldi")
+			return
+		}
+		if portWarning == "ACTIVE" {
+			fmt.Println("PORT : ", portWarning, "please change port") // port aktif uyarısı varsa portu değiştir uyarısı veriyor
+			return
+		}
+		handlers.InsertLinkPort(&db, &item)
 		var srv = &http.Server{
 			Addr:    "127.0.0.1:" + port,
 			Handler: r,
 		}
-		handlers.InsertLinkPort(&db, &item)
-
 		jsonChan := make(chan []byte)
 
 		go getRequest(jsonChan, url) // İstek yaratıp  o urlye istek attım
@@ -82,17 +80,20 @@ var caching = &cobra.Command{
 		go serviceandListen(srv, port) // portu açıyor
 		fmt.Println("Server açıldı")
 
-		go getSignal(srv)
-
-		time.Sleep(2 * time.Minute) // 2 dakika bekliyoruz localin kapanması için
-		// bu komut bütünü de serveri kapatıyor
-		utils.Deletefile()
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := srv.Shutdown(ctx); err != nil {
-			log.Fatalf("HTTP shutdown error: %v", err)
-		}
+		go getSignal(&db, item, srv)
+		shutdownServe(&db, item, srv)
 	},
+}
+
+func shutdownServe(db *model.Database, item model.LinkPort, srv *http.Server) {
+	time.Sleep(2 * time.Minute) // 2 dakika bekliyoruz localin kapanması için
+	// bu komut bütünü de serveri kapatıyor
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	handlers.DeleteLinkPort(db, item)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatalf("HTTP shutdown error: %v", err)
+	}
 }
 
 func serviceandListen(srv *http.Server, port string) {
@@ -102,14 +103,13 @@ func serviceandListen(srv *http.Server, port string) {
 	}
 }
 
-func getSignal(srv *http.Server) {
+func getSignal(db *model.Database, item model.LinkPort, srv *http.Server) {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt)
 
 	// Waiting for SIGINT (kill -2)
 	<-stop
-
-	utils.Deletefile()
+	handlers.DeleteLinkPort(db, item)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {

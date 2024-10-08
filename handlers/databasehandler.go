@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"main.go/model"
@@ -56,5 +57,37 @@ func InsertLinkPort(db *model.Database, linkport *model.LinkPort) error {
 	fmt.Println("Inserted")
 	return nil
 }
-func CheckLinkPort(db *model.Database, item model.LinkPort) {
+func CheckLinkPort(db *model.Database, item model.LinkPort) (bool, string) {
+	filterLink := bson.D{
+		{"link", item.Link},
+	}
+	filterPort := bson.D{
+		{"port", item.Link},
+	}
+	resultLink := db.Collection.FindOne(db.Ctx, filterLink)
+	var linkModel model.LinkPort
+	resultLink.Decode(&linkModel)
+
+	resultPort := db.Collection.FindOne(db.Ctx, filterPort)
+	var portModel model.LinkPort
+	resultPort.Decode(&portModel)
+
+	if linkModel.Link == item.Link {
+		return true, linkModel.Port // Link mevcut o yüzden o linkin portuna ulaş ve isteği yap
+	} else if portModel.Port == item.Port {
+		return false, "ACTIVE" // o port açık değil o yüzden portu değiştirmesini söyle
+	}
+	return false, portModel.Port
+}
+func DeleteLinkPort(db *model.Database, item model.LinkPort) error {
+	filter := bson.D{
+		{"link", item.Link},
+		{"port", item.Port},
+	}
+	resultDeleted, err := db.Collection.DeleteOne(db.Ctx, filter)
+	if err != nil {
+		return err
+	}
+	fmt.Println("resultDeleted", resultDeleted)
+	return nil
 }
