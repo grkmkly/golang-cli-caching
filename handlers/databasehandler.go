@@ -9,6 +9,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"main.go/model"
@@ -44,12 +45,14 @@ func Connect(db *model.Database) error {
 	fmt.Println("Connected database")
 	return nil
 }
-func SetCollection(db *model.Database, collectionName string) {
+func SetCollection(db *model.Database, collectionName string, chanCollection chan bool) {
 	db.Collection = db.Client.Database(db.Database).Collection(collectionName)
 	fmt.Printf("Connected Collection : %v\n", db.Collection.Name())
+	chanCollection <- true
 }
 func InsertLinkPort(db *model.Database, linkport *model.LinkPort) error {
 	linkport.CreatedAt = time.Now()
+	linkport.Id = primitive.NewObjectID()
 	_, err := db.Collection.InsertOne(db.Ctx, linkport)
 	if err != nil {
 		return err
@@ -62,7 +65,7 @@ func CheckLinkPort(db *model.Database, item model.LinkPort) (bool, string) {
 		{"link", item.Link},
 	}
 	filterPort := bson.D{
-		{"port", item.Link},
+		{"port", item.Port},
 	}
 	resultLink := db.Collection.FindOne(db.Ctx, filterLink)
 	var linkModel model.LinkPort
@@ -75,9 +78,9 @@ func CheckLinkPort(db *model.Database, item model.LinkPort) (bool, string) {
 	if linkModel.Link == item.Link {
 		return true, linkModel.Port // Link mevcut o yüzden o linkin portuna ulaş ve isteği yap
 	} else if portModel.Port == item.Port {
-		return false, "ACTIVE" // o port açık değil o yüzden portu değiştirmesini söyle
+		return false, "ACTIVE" // o port açık o yüzden portu değiştirmesini söyle
 	}
-	return false, portModel.Port
+	return false, item.Port
 }
 func DeleteLinkPort(db *model.Database, item model.LinkPort) error {
 	filter := bson.D{
