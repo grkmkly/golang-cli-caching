@@ -62,10 +62,10 @@ func InsertLinkPort(db *model.Database, linkport *model.LinkPort) error {
 }
 func CheckLinkPort(db *model.Database, item model.LinkPort) (bool, string) {
 	filterLink := bson.D{
-		{"link", item.Link},
+		{Key: "link", Value: item.Link},
 	}
 	filterPort := bson.D{
-		{"port", item.Port},
+		{Key: "port", Value: item.Port},
 	}
 	resultLink := db.Collection.FindOne(db.Ctx, filterLink)
 	var linkModel model.LinkPort
@@ -74,7 +74,6 @@ func CheckLinkPort(db *model.Database, item model.LinkPort) (bool, string) {
 	resultPort := db.Collection.FindOne(db.Ctx, filterPort)
 	var portModel model.LinkPort
 	resultPort.Decode(&portModel)
-
 	if linkModel.Link == item.Link {
 		return true, linkModel.Port // Link mevcut o yüzden o linkin portuna ulaş ve isteği yap
 	} else if portModel.Port == item.Port {
@@ -84,8 +83,8 @@ func CheckLinkPort(db *model.Database, item model.LinkPort) (bool, string) {
 }
 func DeleteLinkPort(db *model.Database, item model.LinkPort) error {
 	filter := bson.D{
-		{"link", item.Link},
-		{"port", item.Port},
+		{Key: "link", Value: item.Link},
+		{Key: "port", Value: item.Port},
 	}
 	resultDeleted, err := db.Collection.DeleteOne(db.Ctx, filter)
 	if err != nil {

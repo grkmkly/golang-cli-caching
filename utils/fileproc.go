@@ -10,6 +10,8 @@ import (
 )
 
 var fileName string = "main.txt"
+const MAX_CAPACITYBUFFER int = 20
+const MAX_CAPACITYFILE int = 20
 
 func controlFile() bool {
 	_, err := os.Stat(fileName)
@@ -19,39 +21,43 @@ func controlFile() bool {
 		if err != nil {
 			return false
 		}
-		file.Close()
+		err = file.Close()
+		if err!=nil{
+			log.Fatal(err)
+		}
 	}
 	return true
 }
 
-func Readfile(urlport map[string]string, json chan bool) error {
+func Readfile(port string ,url string) (string,error) {
 	if isErr := controlFile(); !isErr {
-		return errors.New("Exit")
+		return "",errors.New("ControlFileError")
 	}
 	file, err := os.Open(fileName)
-
 	if err != nil {
-		return err
+		return "",err
 	}
-	r := bufio.NewReader(file)
-	for {
-		line, _, err := r.ReadLine()
-		if err != nil {
-			return err
+	// Scannerın bufferi yapıldı.
+	scanner := bufio.NewScanner(file)
+	// eğer bu fonksiyona verilen port ve url içinde varsa error dönüldü...
+	for scanner.Scan(){
+		temp := strings.Split(scanner.Text(),",")
+		if url == temp[0]{
+			fmt.Println("HAVE URL")
+			return temp[1] ,nil
 		}
-		fmt.Print(string(line))
-		if line == nil {
-			fmt.Print("selamlar")
-			break
+		if port == temp[1]{
+			return "" , errors.New("PORT IS NOT AVAILABLE")
 		}
-		lineArray := strings.Split(string(line), "|")
-		urlport[lineArray[0]] = lineArray[1]
 	}
-	file.Close()
-	return nil
+	err = file.Close()
+	if err !=nil{
+		return "",err
+	}
+	return "",nil
 }
 
-func Writefile(key string, value string) error {
+func Writefile(url string, port string) error {
 	if isErr := controlFile(); !isErr {
 		return errors.New("notWrite")
 	}
@@ -59,24 +65,63 @@ func Writefile(key string, value string) error {
 	if err != nil {
 		return err
 	}
-	file.WriteString(key + "|" + value + "\n")
-	file.Close()
+	_,err = file.WriteString(url +","+ port + "\n")
+	if err!=nil{
+		return err
+	}
+	err = file.Close()
+	if err!=nil{
+		return err
+	}
 	return nil
 }
+func Deletefile(port string, url string)error{
+	file , err := os.Open(fileName)
+	if err!=nil{
+		return err
+	}
+	scanner := bufio.NewScanner(file)
+	// eğer bu fonksiyona verilen port ve url içinde varsa error dönüldü...
+	var filetxt [MAX_CAPACITYFILE]string
+	var i int = -1
+	for scanner.Scan(){
+		i++
+		temp := strings.Split(scanner.Text(),",")
+		//fmt.Println("Scanner temp 0 : "+temp[0]+ "\n Scanner temp 1"+ temp[1])
+		if url == temp[0] && port == temp[1]{
+			continue
+		}
+		filetxt[i] = scanner.Text()
+	}
+	err = file.Close()
+	if err!=nil{
+		return err
+	}
+	err = os.Remove(fileName)
+	if err!=nil{
+		return err
+	}
+	if isErr := controlFile();!isErr{
+		return errors.New("ControlFileError")
+	}
+	file2,err := os.OpenFile(fileName,os.O_RDWR,0644)
+	if err !=nil{
+		return err
+	}
 
-func ControlMap(origin string, port string, urlPort map[string]string) bool {
-	for key, value := range urlPort {
-		if key == origin && port == value {
-			return true
+	for j := 0; j < len(filetxt) ; j++{
+		if filetxt[j] == "" && filetxt[j+1] == "" {
+			continue
+		}
+		_,err = file2.WriteString(filetxt[j] + "\n")
+		if err !=nil{
+			return err
 		}
 	}
-	return false
-}
-func Deletefile() {
-	if controlFile() {
-		err := os.Remove(fileName)
-		if err != nil {
-			log.Fatal(err)
-		}
+	err = file2.Close()
+	if err!=nil{
+		return err
 	}
+
+	return nil
 }

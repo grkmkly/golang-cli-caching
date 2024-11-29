@@ -20,6 +20,7 @@ func fncrootCmd() {
 
 func init() {
 	rootCmd.AddCommand(caching)
+	rootCmd.AddCommand(cachingFile)
 }
 
 func Execute() {

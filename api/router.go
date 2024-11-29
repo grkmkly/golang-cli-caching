@@ -8,7 +8,7 @@ import (
 )
 
 func Router(r *mux.Router, jsonFile []byte) {
-	r.HandleFunc("/products", fncProduct(jsonFile))
+	r.HandleFunc("/", fncProduct(jsonFile))
 }
 
 func fncProduct(jsonFile []byte) http.HandlerFunc {

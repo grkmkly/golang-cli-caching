@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/signal"
 	"time"
-
 	"github.com/gorilla/mux"
 	"github.com/spf13/cobra"
 	"main.go/api"
@@ -51,7 +50,7 @@ var caching = &cobra.Command{
 		<-chanCollection
 
 		isHave, portWarning := handlers.CheckLinkPort(&db, item)
-
+		fmt.Println("MERHABA : ", isHave)
 		if portWarning == "ACTIVE" && !isHave {
 			fmt.Println("PORT :", portWarning, "please change port") // port aktif uyarısı varsa portu değiştir uyarısı veriyor
 			return
@@ -63,6 +62,7 @@ var caching = &cobra.Command{
 			go getRequest(locJsonChan, localurl)
 			<-locJsonChan
 			fmt.Println("X-CACHE : HIT")
+			fmt.Println(locJsonChan)
 			return
 		}
 
@@ -105,6 +105,7 @@ func serviceandListen(srv *http.Server, port string) {
 }
 
 func getSignal(db *model.Database, item model.LinkPort, srv *http.Server) {
+	fmt.Println("X-CACHE : MISS")
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt)
 
@@ -132,11 +133,10 @@ func getRequest(jsonChan chan []byte, url string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("X-CACHE : MISS")
 	jsonChan <- jsonFile
 }
 
 func init() {
-	caching.Flags().StringVar(&port, "port", "3000", "--port <mumber>")
-	caching.Flags().StringVar(&url, "origin", "", "--origin <url>")
+	cachingFile.Flags().StringVar(&port, "port", "3000", "--port <mumber>")
+	cachingFile.Flags().StringVar(&url, "origin", "", "--origin <url>")
 }
